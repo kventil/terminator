@@ -29,21 +29,21 @@ Environment variables:
 Common commands:
 - List doctors:
 ```
-termin-ator doctors --portal S55299BD3
+termin-ator --portal S55299BD3 doctors
 ```
 - List available dates per doctor (quick overview):
 ```
-termin-ator availability --portal S55299BD3
+termin-ator --portal S55299BD3 availability
 ```
 - Fetch available dates for one doctor:
 ```
-termin-ator dates --portal S55299BD3 \
-  --doctor USER-1-DOC-1 --insurance Gesetzlich --visitreason Spezial
+termin-ator --portal S55299BD3 \
+  --doctor USER-1-DOC-1 --insurance Gesetzlich --visitreason Spezial dates
 ```
 - Confirm a booking for an appointment id:
 ```
-termin-ator confirm 314602 --portal S55299BD3 \
-  --xsrf "$TERMIN_XSRF_TOKEN" --cookie "$TERMIN_COOKIE"
+termin-ator 314602 --portal S55299BD3 \
+  --xsrf "$TERMIN_XSRF_TOKEN" --cookie "$TERMIN_COOKIE" confirm
 ```
 
 Tips:
@@ -109,12 +109,12 @@ This portal splits booking into two phases: creating an appointment (selecting a
 1) Discover options
 - List doctors:
 ```
-termin-ator doctors --portal S55299BD3
+termin-ator --portal S55299BD3 doctors
 ```
 - Find available dates for your doctor:
 ```
-termin-ator dates --portal S55299BD3 \
-  --doctor USER-1-DOC-1 --insurance Gesetzlich --visitreason Spezial
+termin-ator --portal S55299BD3 \
+  --doctor USER-1-DOC-1 --insurance Gesetzlich --visitreason Spezial dates
 ```
 
 2) Create an appointment (get `appointment_id`)
@@ -123,8 +123,8 @@ termin-ator dates --portal S55299BD3 \
 
 3) Confirm the appointment
 ```
-termin-ator confirm <APPOINTMENT_ID> --portal S55299BD3 \
-  --xsrf "$TERMIN_XSRF_TOKEN" --cookie "$TERMIN_COOKIE"
+termin-ator  --portal S55299BD3 \
+  --xsrf "$TERMIN_XSRF_TOKEN" --cookie "$TERMIN_COOKIE" confirm <APPOINTMENT_ID>
 ```
 - Tokens are usually auto-fetched; if you see 403/419, run:
 ```
