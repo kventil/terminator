@@ -1,6 +1,6 @@
 # Termin_ator CLI
 
-CLI to interact with the onlinepraxistermine.de iframe portal using endpoints captured in `spec.html`.
+CLI to interact with the onlinepraxistermine.de (from https://med.blackt-cms.de/) iframe portal using endpoints captured in `spec.html`.
 
 ## Install
 
