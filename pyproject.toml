@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "termin-ator-cli"
+version = "0.1.0"
+description = "CLI to query dates and submit confirmation for onlinepraxistermine.de portals"
+requires-python = ">=3.9"
+dependencies = [
+  "requests>=2.31.0"
+]
+
+[project.scripts]
+termin-ator = "termin_ator.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
