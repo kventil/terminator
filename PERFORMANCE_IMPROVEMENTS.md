@@ -87,15 +87,22 @@ if isinstance(docs, str):
 **After**:
 ```python
 docs = http_get(docs_url, headers=cfg.headers(), params={}, insecure=cfg.insecure)
-# http_get already returns parsed JSON when content-type is JSON
+# http_get returns parsed JSON when content-type is JSON, or string otherwise
+# Ensure we have a list of doctors to iterate over
+if isinstance(docs, str):
+    try:
+        docs = json.loads(docs)
+    except (json.JSONDecodeError, ValueError):
+        docs = []
 if not isinstance(docs, list):
-    docs = json.loads(docs) if isinstance(docs, str) else []
+    docs = []
 ```
 
 **Impact**:
-- Eliminated unnecessary JSON parsing in the common case
-- Added defensive fallback for edge cases
-- Clearer intent with comments
+- Eliminated redundant JSON parsing when content-type is JSON
+- Added robust error handling for malformed JSON
+- Defensive fallback ensures empty list for non-list responses
+- Clearer intent with explicit comments
 
 ## Overall Impact
 

@@ -272,9 +272,12 @@ def cmd_availability(cfg: ClientConfig, args: argparse.Namespace) -> int:
     ensure_tokens(cfg)
     docs = http_get(docs_url, headers=cfg.headers(), params={}, insecure=cfg.insecure)
     # http_get returns parsed JSON when content-type is JSON, or string otherwise
+    # Ensure we have a list of doctors to iterate over
     if isinstance(docs, str):
-        docs = json.loads(docs)
-    # Ensure we have a list to iterate over
+        try:
+            docs = json.loads(docs)
+        except (json.JSONDecodeError, ValueError):
+            docs = []
     if not isinstance(docs, list):
         docs = []
     results = []
