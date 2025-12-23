@@ -25,6 +25,26 @@ BOOTSTRAP_IFRAME_PREFIX = "/iframe"
 DEFAULT_PORTAL = "S55299BD3"
 
 
+def _suppress_urllib3_warnings() -> None:
+    """Suppress urllib3 SSL warnings to reduce noise when using --insecure."""
+    try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+def _handle_urllib_ssl_retry(req: urllib.request.Request, timeout: int = 30) -> Any:
+    """Handle SSL certificate retry for urllib requests."""
+    context = ssl._create_unverified_context()  # type: ignore[attr-defined]
+    with urllib.request.urlopen(req, timeout=timeout, context=context) as r:  # nosec B310
+        data = r.read()
+        ct = r.headers.get("content-type", "")
+        if "json" in ct:
+            return json.loads(data.decode("utf-8"))
+        return data.decode("utf-8")
+
+
 @dataclass
 class ClientConfig:
     host: str = DEFAULT_HOST
@@ -53,21 +73,13 @@ class ClientConfig:
 def http_get(url: str, headers: Dict[str, str], params: Dict[str, Any], insecure: bool = False) -> Any:
     if requests is not None:
         if insecure:
-            try:
-                import urllib3
-                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            _suppress_urllib3_warnings()
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=30, verify=not insecure)
         except Exception as e:
             # Retry once with verify disabled if cert errors occur
             if not insecure and "CERTIFICATE_VERIFY_FAILED" in str(e):
-                try:
-                    import urllib3
-                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+                _suppress_urllib3_warnings()
                 resp = requests.get(url, headers=headers, params=params, timeout=30, verify=False)
             else:
                 raise
@@ -89,33 +101,19 @@ def http_get(url: str, headers: Dict[str, str], params: Dict[str, Any], insecure
         raise RuntimeError(f"HTTP {e.code} for GET {full_url}: {e.read().decode('utf-8', 'ignore')}")
     except urllib.error.URLError as e:
         if not insecure and "CERTIFICATE_VERIFY_FAILED" in str(getattr(e, "reason", e)):
-            context = ssl._create_unverified_context()  # type: ignore[attr-defined]
-            with urllib.request.urlopen(req, timeout=30, context=context) as r:  # nosec B310
-                data = r.read()
-                ct = r.headers.get("content-type", "")
-                if "json" in ct:
-                    return json.loads(data.decode("utf-8"))
-                return data.decode("utf-8")
+            return _handle_urllib_ssl_retry(req)
         raise
 
 
 def http_post(url: str, headers: Dict[str, str], json_body: Dict[str, Any], insecure: bool = False) -> Any:
     if requests is not None:
         if insecure:
-            try:
-                import urllib3
-                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            _suppress_urllib3_warnings()
         try:
             resp = requests.post(url, headers=headers, json=json_body, timeout=30, verify=not insecure)
         except Exception as e:
             if not insecure and "CERTIFICATE_VERIFY_FAILED" in str(e):
-                try:
-                    import urllib3
-                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+                _suppress_urllib3_warnings()
                 resp = requests.post(url, headers=headers, json=json_body, timeout=30, verify=False)
             else:
                 raise
@@ -138,23 +136,18 @@ def http_post(url: str, headers: Dict[str, str], json_body: Dict[str, Any], inse
         raise RuntimeError(f"HTTP {e.code} for POST {url}: {e.read().decode('utf-8', 'ignore')}")
     except urllib.error.URLError as e:
         if not insecure and "CERTIFICATE_VERIFY_FAILED" in str(getattr(e, "reason", e)):
-            context = ssl._create_unverified_context()  # type: ignore[attr-defined]
-            with urllib.request.urlopen(req, timeout=30, context=context) as r:  # nosec B310
-                data = r.read()
-                ct = r.headers.get("content-type", "")
-                if "json" in ct:
-                    return json.loads(data.decode("utf-8"))
-                return data.decode("utf-8")
+            return _handle_urllib_ssl_retry(req)
         raise
 
 
 def _cookie_header_from_jar(jar: "cookiejar.CookieJar") -> str:
     parts = []
-    names = set()
+    has_consent = False
     for c in jar:
         parts.append(f"{c.name}={c.value}")
-        names.add(c.name)
-    if "cookieConsent" not in names:
+        if c.name == "cookieConsent":
+            has_consent = True
+    if not has_consent:
         parts.append("cookieConsent=true")
     return "; ".join(parts)
 
@@ -171,11 +164,7 @@ def ensure_tokens(cfg: ClientConfig) -> None:
     if requests is not None:
         try:
             if cfg.insecure:
-                try:
-                    import urllib3
-                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+                _suppress_urllib3_warnings()
             s = requests.Session()
             s.cookies.set("cookieConsent", "true")
             r = s.get(iframe_url, timeout=15, verify=not cfg.insecure)
@@ -282,8 +271,9 @@ def cmd_availability(cfg: ClientConfig, args: argparse.Namespace) -> int:
         return 0
     ensure_tokens(cfg)
     docs = http_get(docs_url, headers=cfg.headers(), params={}, insecure=cfg.insecure)
-    if isinstance(docs, str):
-        docs = json.loads(docs)
+    # http_get already returns parsed JSON when content-type is JSON
+    if not isinstance(docs, list):
+        docs = json.loads(docs) if isinstance(docs, str) else []
     results = []
     for d in docs:
         doc_id = d.get("doc_id")
