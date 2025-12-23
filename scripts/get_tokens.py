@@ -30,13 +30,23 @@ import http.cookiejar as cookiejar
 import warnings
 
 
+def _suppress_urllib3_warnings() -> None:
+    """Suppress urllib3 SSL warnings to reduce noise when using --insecure."""
+    try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
 def cookie_header_from_jar(jar: "cookiejar.CookieJar") -> str:
     parts = []
-    names = set()
+    has_consent = False
     for c in jar:
         parts.append(f"{c.name}={c.value}")
-        names.add(c.name)
-    if "cookieConsent" not in names:
+        if c.name == "cookieConsent":
+            has_consent = True
+    if not has_consent:
         parts.append("cookieConsent=true")
     return "; ".join(parts)
 
@@ -48,11 +58,7 @@ def fetch_tokens(host: str, portal: str, iframe_prefix: str = "/iframe", insecur
     if requests is not None:
         try:
             if insecure:
-                try:
-                    import urllib3
-                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+                _suppress_urllib3_warnings()
             s = requests.Session()
             s.cookies.set("cookieConsent", "true")
             r = s.get(iframe_url, timeout=15, verify=not insecure)
